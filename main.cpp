@@ -4,8 +4,6 @@
 
 using namespace std;
 
-static const 
-
 // STRINGS
 
 class unowned_string
@@ -98,6 +96,11 @@ inline unsigned index_by_char(char c)
     return (unsigned) (c - 'a');
 }
 
+inline char char_by_index(unsigned idx)
+{
+    return ((char) idx) + 'a';
+}
+
 struct TrieNode
 {
     TrieNode() : m_childs(), m_value(0) {}
@@ -105,15 +108,73 @@ struct TrieNode
     unsigned m_value;
 };
 
+class Trie_iterator
+{
+public:
+    Trie_iterator(unsigned level_count, TrieNode *root)
+        : m_level_count(level_count), m_len(0), m_value(0), m_root(root)
+    {
+        m_key_buf = new char[level_count]();
+        m_childs_idxs = new int[level_count]();
+
+        TrieNode * pnode = m_root;
+        for (unsigned level = 0; level < m_level_count; level++)
+        {
+            if (!pnode)
+                break;
+            m_value = pnode->m_value;
+            unsigned idx = find_non_null_child(pnode);
+            if (idx == alphabet_size)
+                break;
+            m_key_buf[level] = char_by_index(idx);
+            m_childs_idxs[level] = idx;
+            m_len++;
+            pnode = pnode->m_childs[idx];
+        }
+    }
+    ~Trie_iterator()
+    {
+        delete[] m_key_buf;
+        delete[] m_childs_idxs;
+    }
+
+    unowned_string get_key() const { return unowned_string(m_key_buf, m_len); }
+    unsigned get_value() const { return m_value; }
+private:
+    unsigned find_non_null_child(TrieNode * node, unsigned start = 0)
+    {
+        for (unsigned i = start; i < alphabet_size; i++)
+        {
+            if (node->m_childs[i])
+                return i;
+        }
+        return alphabet_size;
+    }
+
+    unsigned m_level_count;
+
+    char * m_key_buf;
+    int * m_childs_idxs;
+
+    unsigned m_len;
+    unsigned m_value;
+
+    TrieNode * m_root;
+};
+
+
 class Trie
 {
 public:
-    Trie() : m_root(), m_count(0) {}
+    Trie() : m_root(), m_count(0), m_levels(0) {}
 
     unsigned& operator[](const unowned_string& uo_str);
+
+    Trie_iterator begin() { return Trie_iterator(m_levels, &m_root); }
 private:
     TrieNode m_root;
     unsigned m_count;
+    unsigned m_levels;
 };
 
 unsigned& Trie::operator[](const unowned_string& uo_str)
@@ -128,13 +189,10 @@ unsigned& Trie::operator[](const unowned_string& uo_str)
         pnode = pnode->m_childs[child_idx];
     }
 
-    return pnode->m_value;
-}
+    if (uo_str.size() > m_levels)
+        m_levels = uo_str.size();
 
-class Trie_iterator
-{
-private:
-    m_key
+    return pnode->m_value;
 }
 
 int main()
@@ -150,8 +208,11 @@ int main()
     t[uo_str1] = 1;
     t[uo_str2] = 2;
 
-    cout.write(uo_str1.c_str(), uo_str1.size()); cout << " : " << t[uo_str1] << endl;
-    cout.write(uo_str2.c_str(), uo_str2.size()); cout << " : " << t[uo_str2] << endl;
+    Trie_iterator tit = t.begin();
+
+    cout.write(tit.get_key().c_str(), tit.get_key().size()); cout << " : " << tit.get_value() << endl;
+    // cout.write(uo_str1.c_str(), uo_str1.size()); cout << " : " << t[uo_str1] << endl;
+    // cout.write(uo_str2.c_str(), uo_str2.size()); cout << " : " << t[uo_str2] << endl;
 
     return 0;
 }
