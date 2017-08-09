@@ -122,7 +122,6 @@ public:
         {
             if (!pnode)
                 break;
-            m_value = pnode->m_value;
             unsigned idx = find_non_null_child(pnode);
             if (idx == alphabet_size)
                 break;
@@ -130,6 +129,7 @@ public:
             m_childs_idxs[level] = idx;
             m_len++;
             pnode = pnode->m_childs[idx];
+            m_value = pnode->m_value;
         }
     }
     ~Trie_iterator()
