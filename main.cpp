@@ -103,8 +103,9 @@ inline char char_by_index(unsigned idx)
 
 struct TrieNode
 {
-    TrieNode() : m_childs(), m_value(0) {}
+    TrieNode(TrieNode* parent = nullptr) : m_childs(), m_parent(parent), m_value(0) {}
     TrieNode* m_childs[alphabet_size];
+    TrieNode* m_parent;
     unsigned m_value;
 };
 
@@ -112,37 +113,72 @@ class Trie_iterator
 {
 public:
     Trie_iterator(unsigned level_count, TrieNode *root)
-        : m_level_count(level_count), m_len(0), m_value(0), m_root(root)
+        : m_len(0), m_node(root)
     {
         m_key_buf = new char[level_count]();
-        m_childs_idxs = new int[level_count]();
 
-        TrieNode * pnode = m_root;
-        for (unsigned level = 0; level < m_level_count; level++)
+        for (unsigned level = 0; level < level_count; level++)
         {
-            if (!pnode)
-                break;
-            unsigned idx = find_non_null_child(pnode);
+            unsigned idx = find_non_null_child(m_node);
             if (idx == alphabet_size)
                 break;
             m_key_buf[level] = char_by_index(idx);
-            m_childs_idxs[level] = idx;
             m_len++;
-            pnode = pnode->m_childs[idx];
-            m_value = pnode->m_value;
+            if (get_value() > 0)
+                break;
+            m_node = m_node->m_childs[idx];
         }
     }
     ~Trie_iterator()
     {
         delete[] m_key_buf;
-        delete[] m_childs_idxs;
+    }
+
+    void next()
+    {
+        if (m_node == nullptr)
+            return;
+        if (m_len == 0)
+            return;
+
+        unsigned cur_idx = index_by_char(m_key_buf[m_len-1]);
+        if (cur_idx == alphabet_size)
+        {
+            m_node = m_node->m_parent;
+            m_len--;
+        }
+        if (m_node->m_childs[cur_idx])
+        {
+            m_node = m_node->m_childs[cur_idx];
+            m_len++;
+            m_key_buf[m_len-1] = 'a';
+            return;
+        }
+        m_key_buf[m_len-1]++;
+    }
+
+    Trie_iterator& operator++()
+    {
+        next();
+        while (m_node != nullptr && get_value() == 0)
+            next();
+        return *this;
     }
 
     unowned_string get_key() const { return unowned_string(m_key_buf, m_len); }
-    unsigned get_value() const { return m_value; }
+    //unsigned get_value() const { return m_value; }
+    unsigned get_value() const
+    {
+        if (!m_node) return 0;
+        if (m_len == 0) return 0;
+        unsigned cur_idx = index_by_char(m_key_buf[m_len-1]);
+        return m_node->m_childs[cur_idx] == nullptr ? 0 : m_node->m_childs[cur_idx]->m_value;
+    }
 private:
     unsigned find_non_null_child(TrieNode * node, unsigned start = 0)
     {
+        if (!node)
+            return alphabet_size;
         for (unsigned i = start; i < alphabet_size; i++)
         {
             if (node->m_childs[i])
@@ -151,15 +187,9 @@ private:
         return alphabet_size;
     }
 
-    unsigned m_level_count;
-
     char * m_key_buf;
-    int * m_childs_idxs;
-
     unsigned m_len;
-    unsigned m_value;
-
-    TrieNode * m_root;
+    TrieNode * m_node;
 };
 
 
@@ -185,7 +215,7 @@ unsigned& Trie::operator[](const unowned_string& uo_str)
     {
         unsigned child_idx = index_by_char(uo_str.c_str()[level]);
         if (!pnode->m_childs[child_idx])
-            pnode->m_childs[child_idx] = new TrieNode();
+            pnode->m_childs[child_idx] = new TrieNode(pnode);
         pnode = pnode->m_childs[child_idx];
     }
 
@@ -201,16 +231,24 @@ int main()
 
     const char *str1 = "text";
     const char *str2 = "test";
+    const char *str3 = "tes";
 
     unowned_string uo_str1 = str1;
     unowned_string uo_str2 = str2;
+    unowned_string uo_str3 = str3;
 
     t[uo_str1] = 1;
     t[uo_str2] = 2;
+    t[uo_str3] = 3;
 
     Trie_iterator tit = t.begin();
 
     cout.write(tit.get_key().c_str(), tit.get_key().size()); cout << " : " << tit.get_value() << endl;
+    ++tit;
+    cout.write(tit.get_key().c_str(), tit.get_key().size()); cout << " : " << tit.get_value() << endl;
+    ++tit;
+    cout.write(tit.get_key().c_str(), tit.get_key().size()); cout << " : " << tit.get_value() << endl;
+
     // cout.write(uo_str1.c_str(), uo_str1.size()); cout << " : " << t[uo_str1] << endl;
     // cout.write(uo_str2.c_str(), uo_str2.size()); cout << " : " << t[uo_str2] << endl;
 
